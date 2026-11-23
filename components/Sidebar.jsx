@@ -1,6 +1,7 @@
 "use client";
 
 import { FolderKanban, LayoutDashboard, Network, Plus, X } from "lucide-react";
+import { recentProjects } from "@/lib/agents";
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -82,7 +83,7 @@ export default function Sidebar({
           </p>
           <ul className="space-y-1">
             {recentSearches.length === 0 && <li className="px-3 py-2 text-xs leading-5 text-zinc-500">Your searches and results will appear here.</li>}
-            {recentSearches.map((project) => {
+            {[...recentSearches, ...recentProjects].map((project) => {
               const active = activeProjectId === project.id;
               return (
                 <li key={project.id}>
@@ -95,9 +96,9 @@ export default function Sidebar({
                         : "text-zinc-400 hover:bg-white/5 hover:text-zinc-100"
                     }`}
                   >
-                    <span className="block truncate text-sm" title={project.problem}>{project.problem}</span>
+                    <span className="block truncate text-sm" title={project.problem}>{project.title || project.problem}</span>
                     <span className="mt-0.5 block text-xs text-zinc-500">
-                      {project.error ? "Partial results" : "Saved results"}
+                      {project.detail ? `Example · ${project.detail}` : project.error ? "Partial results" : "Saved results"}
                     </span>
                   </button>
                 </li>

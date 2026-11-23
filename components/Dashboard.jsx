@@ -92,7 +92,7 @@ export default function Dashboard() {
     setActiveView("dashboard");
     setActiveProjectId(project.id);
     setProblem(project.problem);
-    setAnalysis(project.analysis);
+    setAnalysis(project.analysis || null);
     setError(project.error || null);
     closeMenu();
   }
