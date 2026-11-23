@@ -9,7 +9,7 @@ const icons = {
   Scale,
 };
 
-export default function AgentCard({ agent, output }) {
+export default function AgentCard({ agent, output, status }) {
   const Icon = icons[agent.icon];
 
   return (
@@ -20,6 +20,7 @@ export default function AgentCard({ agent, output }) {
         </span>
         <div>
           <h3 className="text-sm font-medium text-zinc-50">{agent.name}</h3>
+          <p className="mt-1 text-xs text-violet-300" aria-live="polite">{status}</p>
           <p className="mt-1 text-sm leading-6 text-zinc-400">
             {agent.description}
           </p>
@@ -28,9 +29,9 @@ export default function AgentCard({ agent, output }) {
 
       <div className="mt-5 flex-1 rounded-xl border border-dashed border-white/10 bg-black/20 px-4 py-3">
         {output ? (
-          <p className="text-sm leading-6 whitespace-pre-line text-zinc-300">
-            {output}
-          </p>
+          <div className="space-y-4 text-sm leading-6 text-zinc-300">
+            {Object.entries(output).map(([key, value]) => <div key={key}><h4 className="font-medium text-zinc-100">{key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase())}</h4>{Array.isArray(value) ? <ul className="mt-1 list-disc space-y-2 pl-4">{value.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p className="mt-1">{value}</p>}</div>)}
+          </div>
         ) : (
           <p className="text-sm leading-6 text-zinc-500">
             This agent’s reading will appear here after an analysis.

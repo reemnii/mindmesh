@@ -14,7 +14,7 @@ export default function ReportPanel({ report }) {
             Consolidated report
           </h2>
           <p className="text-sm text-zinc-500">
-            Reserved for the synthesis of all four agents.
+            The most important insights and recommendations from all four agents.
           </p>
         </div>
       </div>
@@ -36,6 +36,7 @@ export default function ReportPanel({ report }) {
               </p>
               <p className="mt-2 text-sm leading-7 text-zinc-300">{report.path}</p>
             </div>
+            {[ ["Key insights", report.keyInsights], ["Recommendations", report.recommendations] ].map(([title, items]) => <div key={title}><h3 className="text-sm font-medium text-violet-300">{title}</h3><ul className="mt-2 list-disc space-y-2 pl-4 text-sm leading-7 text-zinc-300">{items.map((item, index) => <li key={index}>{item}</li>)}</ul></div>)}
           </div>
           <div className="rounded-xl bg-black/25 p-4">
             <p className="text-[11px] tracking-[0.16em] text-zinc-500 uppercase">

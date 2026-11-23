@@ -1,15 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Menu, Sparkles } from "lucide-react";
 import { agents } from "@/lib/agents";
-import { buildPreviewAnalysis } from "@/lib/previewAnalysis";
 import AgentCard from "@/components/AgentCard";
 import ReportPanel from "@/components/ReportPanel";
 import Sidebar from "@/components/Sidebar";
-
-const sampleProblem =
-  "A research group wants help turning a difficult question into a decision. They have conflicting notes, a short deadline, and no interest in a generic summary that erases disagreement.";
 
 export default function Dashboard() {
   const [activeView, setActiveView] = useState("dashboard");
@@ -18,12 +14,22 @@ export default function Dashboard() {
   const [problem, setProblem] = useState("");
   const [analysis, setAnalysis] = useState(null);
   const [running, setRunning] = useState(false);
+  const [error, setError] = useState(null);
+  const activeRequest = useRef(null);
+
+  function cancelAnalysis() {
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    setRunning(false);
+    setError(null);
+  }
 
   function closeMenu() {
     setMenuOpen(false);
   }
 
   function startNewAnalysis() {
+    cancelAnalysis();
     setActiveView("new");
     setActiveProjectId(null);
     setProblem("");
@@ -42,6 +48,7 @@ export default function Dashboard() {
   }
 
   function handleSelectProject(project) {
+    cancelAnalysis();
     setActiveView("dashboard");
     setActiveProjectId(project.id);
     setProblem(project.problem);
@@ -49,15 +56,27 @@ export default function Dashboard() {
     closeMenu();
   }
 
-  function handleAnalyze() {
-    const brief = problem.trim() || sampleProblem;
-    if (!problem.trim()) setProblem(sampleProblem);
+  async function handleAnalyze() {
+    if (running) return;
+    const brief = problem.trim();
+    if (!brief) { setError({ message: "Describe your problem before starting an analysis." }); return; }
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    setError(null);
+    setAnalysis(null);
     setRunning(true);
     setActiveView("dashboard");
-    window.setTimeout(() => {
-      setAnalysis(buildPreviewAnalysis(brief));
-      setRunning(false);
-    }, 450);
+    try {
+      const response = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ problem: brief }), signal: controller.signal });
+      const result = await response.json();
+      if (activeRequest.current !== controller) return;
+      setAnalysis({ outputs: result.outputs || {}, report: result.report || null });
+      if (!response.ok) setError(result.error || { message: "Analysis failed. Please retry." });
+    } catch (failure) {
+      if (activeRequest.current === controller && failure.name !== "AbortError") setError({ message: "Could not reach the analysis service. Check your connection and retry." });
+    } finally {
+      if (activeRequest.current === controller) { setRunning(false); activeRequest.current = null; }
+    }
   }
 
   return (
@@ -109,6 +128,8 @@ export default function Dashboard() {
               <textarea
                 id="challenge"
                 value={problem}
+                maxLength={10000}
+                disabled={running}
                 onChange={(event) => setProblem(event.target.value)}
                 placeholder="What decision, tension, or question should the agents take apart?"
                 className="mt-3 min-h-40 w-full resize-y rounded-2xl border border-white/8 bg-[#121116] px-4 py-4 text-sm leading-7 text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-violet-400/50"
@@ -116,8 +137,8 @@ export default function Dashboard() {
               <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="px-1 text-xs text-zinc-500">
                   {running
-                    ? "Preparing a sample reading for the layout."
-                    : "Analysis stays local for now. This button previews the layout with sample output."}
+                    ? "Running Research, Strategy, Creative, Critic, then synthesis. This may take a few minutes."
+                    : "Your problem is sent to Gemini for analysis. Up to 10,000 characters."}
                 </p>
                 <button
                   type="button"
@@ -129,6 +150,7 @@ export default function Dashboard() {
                   {running ? "Analyzing…" : "Analyze with MindMesh"}
                 </button>
               </div>
+              {error && <p role="alert" className="mt-4 text-sm text-red-300">{error.stage ? `${error.stage[0].toUpperCase()}${error.stage.slice(1)} failed: ` : ""}{error.message} {error.stage && "Subsequent stages were not run."}</p>}
             </section>
 
             <section className="mt-8">
@@ -146,6 +168,7 @@ export default function Dashboard() {
                     key={agent.id}
                     agent={agent}
                     output={analysis?.outputs[agent.id]}
+                    status={analysis?.outputs[agent.id] ? "Completed" : error?.stage === agent.id ? "Failed" : running ? "Awaiting results" : error?.stage ? "Not run" : "Ready"}
                   />
                 ))}
               </div>
