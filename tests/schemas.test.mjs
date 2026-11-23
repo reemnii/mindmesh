@@ -26,3 +26,39 @@ test("creative output requires exactly three nonblank approaches", () => {
   const valid = validValue(schemas.creativeSchema);
   for (const approaches of [[], ["one", "two"], ["one", "two", "three", "four"], ["one", "two", "  "], ["one", "two", {}]]) assert.equal(schemas.validate({ ...valid, innovativeApproaches: approaches }, schemas.creativeSchema), false);
 });
+
+test("report requires every section and complete roadmap, budget, evidence, and metric records", () => {
+  const valid = validValue(schemas.reportSchema);
+  valid.evidence.verifiedInformation = [];
+  valid.contradictionsAndTradeoffs = [];
+  assert.equal(schemas.validate(valid, schemas.reportSchema), true);
+  for (const section of schemas.reportSchema.required) {
+    const incomplete = { ...valid };
+    delete incomplete[section];
+    assert.equal(schemas.validate(incomplete, schemas.reportSchema), false, section);
+  }
+  for (const [section, field] of [["implementationRoadmap", "milestone"], ["resourcesAndBudget", "basis"], ["successMetrics", "proposedTarget"], ["risksAndMitigations", "mitigation"]]) {
+    const incomplete = structuredClone(valid);
+    delete incomplete[section][0][field];
+    assert.equal(schemas.validate(incomplete, schemas.reportSchema), false, `${section}.${field}`);
+  }
+});
+
+test("collaboration records require findings, comparisons, and actionable corrections", () => {
+  for (const [schema, field, missing] of [
+    [schemas.strategySchema, "researchInfluences", "researchFinding"],
+    [schemas.creativeSchema, "strategyComparisons", "improvement"],
+  ]) {
+    const value = validValue(schema);
+    delete value[field][0][missing];
+    assert.equal(schemas.validate(value, schema), false);
+  }
+  const creative = validValue(schemas.creativeSchema);
+  creative.strategyComparisons.pop();
+  assert.equal(schemas.validate(creative, schemas.creativeSchema), false);
+  const critic = validValue(schemas.criticSchema);
+  critic.specificCorrections = [{ priorClaim: "An actual claim", weakness: "A weakness" }];
+  assert.equal(schemas.validate(critic, schemas.criticSchema), false);
+  critic.specificCorrections = [];
+  assert.equal(schemas.validate(critic, schemas.criticSchema), true);
+});

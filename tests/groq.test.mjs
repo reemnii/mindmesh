@@ -39,10 +39,24 @@ const request = () => new Request("http://localhost/api/test-groq", { method: "P
 const analysisRequest = () => new Request("http://localhost/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ problem: "test" }) });
 
 const researchOutput = { coreProblem: "test", rootCauses: ["cause"], context: ["context"], opportunities: ["opportunity"], assumptions: ["assumption"], risks: ["risk"], missingInformation: ["question"] };
-const strategyOutput = { objectives: ["objective"], prioritizedSteps: ["step"], requiredResources: ["resource"], expectedOutcomes: ["outcome"], successMetrics: ["metric"] };
-const creativeOutput = { innovativeApproaches: ["approach one", "approach two", "approach three"], unconventionalOpportunities: ["opportunity"], solutionIdeas: ["idea"], strategyImprovements: ["improvement"] };
-const criticOutput = { weakAssumptions: ["assumption"], contradictions: ["contradiction"], unrealisticRecommendations: ["recommendation"], missingConsiderations: ["consideration"], improvements: ["improvement"] };
-const reportOutput = { reading: "reading", path: "path", keyInsights: ["insight"], recommendations: ["recommendation"], questions: ["question"] };
+const strategyOutput = { objectives: ["objective"], prioritizedSteps: ["step"], requiredResources: ["resource"], expectedOutcomes: ["outcome"], successMetrics: ["metric"], researchInfluences: [{ researchFinding: "Research context, item 1: context", decision: "Prioritized step 1 addresses this context" }] };
+const creativeOutput = { innovativeApproaches: ["approach one", "approach two", "approach three"], unconventionalOpportunities: ["opportunity"], solutionIdeas: ["idea"], strategyImprovements: ["improvement"], strategyComparisons: [1, 2, 3].map((index) => ({ strategyRecommendation: "Strategy prioritizedSteps, item 1: step", creativeApproach: `Approach ${index}`, improvement: "A distinct improvement to validate" })) };
+const criticOutput = { weakAssumptions: ["assumption"], contradictions: ["contradiction"], unrealisticRecommendations: ["recommendation"], missingConsiderations: ["consideration"], improvements: ["improvement"], specificCorrections: [{ priorClaim: "Strategy successMetrics, item 1: metric", weakness: "The baseline is not known", correction: "Measure baseline first" }] };
+const reportOutput = {
+  executiveSummary: "Test decision summary",
+  problemDiagnosis: "Test diagnosis",
+  keyResearchFindings: ["Research context item 1: user-provided context"],
+  recommendedSolution: "A proposed solution",
+  alternativeApproaches: ["A distinct alternative"],
+  implementationRoadmap: [{ phase: "Pilot", timeframe: "Proposed weeks 1–2", owner: "Coordinator", actions: ["Validate assumptions"], milestone: "Review pilot evidence" }],
+  resourcesAndBudget: [{ category: "Staff", resources: "Coordinator time", estimate: "Not yet costed", basis: "Confirm available hours and local quotes" }],
+  risksAndMitigations: [{ risk: "Low participation", mitigation: "Validate demand before expanding" }],
+  ethicalAndPrivacyConsiderations: ["Obtain consent and minimize retained data"],
+  successMetrics: [{ metric: "Participation", baseline: "Baseline unknown", proposedTarget: "Set after baseline measurement", measurement: "Count consented participation weekly" }],
+  criticRecommendations: ["Verify the participation assumption before launch"],
+  evidence: { verifiedInformation: [], providedInformation: ["User-provided context"], assumptions: ["Demand is unverified"], proposedTargets: ["Pilot timing is proposed"] },
+  contradictionsAndTradeoffs: [{ issue: "Speed versus validation", resolution: "Pilot first", remainingTradeoff: "Expansion depends on pilot evidence" }],
+};
 
 function schemaFailure() {
   return Response.json({ error: { message: "Generated JSON does not match the expected schema: missing strategyImprovements", code: "json_validate_failed", type: "invalid_request_error", failed_generation: "PRIVATE_UNVALIDATED_OUTPUT" } }, { status: 400 });
@@ -167,13 +181,26 @@ test("Creative recovers with one new validated generation, then Critic and repor
   configure(t);
   const replies = [() => completion(researchOutput), () => completion(strategyOutput), schemaFailure, () => completion(creativeOutput), () => completion(criticOutput), () => completion(reportOutput)];
   let calls = 0;
-  t.mock.method(globalThis, "fetch", async () => replies[calls++]());
+  const bodies = [];
+  t.mock.method(globalThis, "fetch", async (_url, options) => {
+    bodies.push(JSON.parse(options.body));
+    return replies[calls++]();
+  });
   const response = await analyze(analysisRequest());
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.deepEqual(body.outputs.creative, creativeOutput);
   assert.deepEqual(body.outputs.critic, criticOutput);
   assert.deepEqual(body.report, reportOutput);
+  assert.deepEqual(body.outputs.research, researchOutput);
+  assert.deepEqual(body.outputs.strategy, strategyOutput);
+  assert.deepEqual(JSON.parse(bodies.at(-1).messages[1].content), {
+    problem: "test", research: researchOutput, strategy: strategyOutput,
+    creative: creativeOutput, critic: criticOutput,
+  });
+  assert.equal(bodies.at(-1).max_completion_tokens, 8192);
+  assert.equal(bodies.at(-1).reasoning_effort, "low");
+  assert.equal(bodies[0].max_completion_tokens, 4096);
   assert.equal(calls, 6);
 });
 

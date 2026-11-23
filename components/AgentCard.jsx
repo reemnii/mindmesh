@@ -9,6 +9,20 @@ const icons = {
   Scale,
 };
 
+function label(key) {
+  return key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function OutputValue({ value }) {
+  if (Array.isArray(value)) {
+    return value.length ? <ol className="mt-1 list-decimal space-y-3 pl-5 marker:text-violet-300/60">{value.map((item, index) => <li key={index} className="pl-1"><OutputValue value={item} /></li>)}</ol> : <p className="mt-1 text-zinc-500">No material corrections identified.</p>;
+  }
+  if (value && typeof value === "object") {
+    return <dl className="space-y-2 rounded-lg bg-black/15 p-3">{Object.entries(value).map(([key, item]) => <div key={key}><dt className="text-xs font-medium text-violet-300">{label(key)}</dt><dd className="mt-1"><OutputValue value={item} /></dd></div>)}</dl>;
+  }
+  return <p className="whitespace-pre-line">{value}</p>;
+}
+
 export default function AgentCard({ agent, output, status }) {
   const Icon = icons[agent.icon];
 
@@ -30,7 +44,7 @@ export default function AgentCard({ agent, output, status }) {
       <div className="mt-5 flex-1 rounded-xl border border-dashed border-white/10 bg-black/20 px-4 py-3">
         {output ? (
           <div className="space-y-4 text-sm leading-6 text-zinc-300">
-            {Object.entries(output).map(([key, value]) => <div key={key}><h4 className="font-medium text-zinc-100">{key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase())}</h4>{Array.isArray(value) ? <ul className="mt-1 list-disc space-y-2 pl-4">{value.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p className="mt-1">{value}</p>}</div>)}
+            {Object.entries(output).map(([key, value]) => <div key={key}><h4 className="font-medium text-zinc-100">{label(key)}</h4><div className="mt-1"><OutputValue value={value} /></div></div>)}
           </div>
         ) : (
           <p className="text-sm leading-6 text-zinc-500">
