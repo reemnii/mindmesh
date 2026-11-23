@@ -1,7 +1,6 @@
 "use client";
 
 import { FolderKanban, LayoutDashboard, Network, Plus, X } from "lucide-react";
-import { recentProjects } from "@/lib/agents";
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -9,6 +8,7 @@ const navItems = [
 ];
 
 export default function Sidebar({
+  recentSearches,
   activeView,
   activeProjectId,
   onNavigate,
@@ -75,13 +75,14 @@ export default function Sidebar({
           })}
         </nav>
 
-        <div className="mt-8 px-2">
+        <div className="mt-8 min-h-0 flex-1 overflow-y-auto px-2">
           <p className="mb-3 flex items-center gap-2 text-[11px] font-medium tracking-[0.16em] text-zinc-500 uppercase">
             <FolderKanban size={12} />
-            Recent projects
+            Recent searches
           </p>
           <ul className="space-y-1">
-            {recentProjects.map((project) => {
+            {recentSearches.length === 0 && <li className="px-3 py-2 text-xs leading-5 text-zinc-500">Your searches and results will appear here.</li>}
+            {recentSearches.map((project) => {
               const active = activeProjectId === project.id;
               return (
                 <li key={project.id}>
@@ -94,9 +95,9 @@ export default function Sidebar({
                         : "text-zinc-400 hover:bg-white/5 hover:text-zinc-100"
                     }`}
                   >
-                    <span className="block text-sm">{project.title}</span>
+                    <span className="block truncate text-sm" title={project.problem}>{project.problem}</span>
                     <span className="mt-0.5 block text-xs text-zinc-500">
-                      {project.detail}
+                      {project.error ? "Partial results" : "Saved results"}
                     </span>
                   </button>
                 </li>
@@ -106,8 +107,7 @@ export default function Sidebar({
         </div>
 
         <p className="mt-auto px-3 pt-8 text-xs leading-5 text-zinc-600">
-          Interface preview. Agent responses are sample text until the model is
-          connected.
+          Your latest 30 searches and results are saved in this browser.
         </p>
       </aside>
     </>

@@ -1,13 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu, Sparkles } from "lucide-react";
 import { agents } from "@/lib/agents";
 import AgentCard from "@/components/AgentCard";
 import ReportPanel from "@/components/ReportPanel";
 import Sidebar from "@/components/Sidebar";
 
+const HISTORY_KEY = "mindmesh.recent-searches.v1";
+
 export default function Dashboard() {
+  const [recentSearches, setRecentSearches] = useState([]);
+  const [storageError, setStorageError] = useState(null);
+  const history = useRef([]);
   const [activeView, setActiveView] = useState("dashboard");
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -16,6 +21,41 @@ export default function Dashboard() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState(null);
   const activeRequest = useRef(null);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+      history.current = Array.isArray(saved) ? saved.filter((entry) =>
+        entry && typeof entry.id === "string" && typeof entry.problem === "string" &&
+        entry.analysis && typeof entry.analysis.outputs === "object" && entry.analysis.outputs !== null
+      ).slice(0, 30) : [];
+      // Restore browser storage after hydration, when localStorage is available.
+      setRecentSearches(history.current);
+    } catch {
+      setStorageError("Saved searches could not be loaded from this browser.");
+    }
+    return () => activeRequest.current?.abort();
+  }, []);
+
+  function saveSearch(brief, savedAnalysis, savedError) {
+    const entry = {
+      id: crypto.randomUUID(),
+      problem: brief,
+      analysis: savedAnalysis,
+      error: savedError,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [entry, ...history.current].slice(0, 30);
+    history.current = updated;
+    setRecentSearches(updated);
+    setActiveProjectId(entry.id);
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+      setStorageError(null);
+    } catch {
+      setStorageError("This search is available for this session, but could not be saved in this browser. Storage may be full or disabled.");
+    }
+  }
 
   function cancelAnalysis() {
     activeRequest.current?.abort();
@@ -52,7 +92,8 @@ export default function Dashboard() {
     setActiveView("dashboard");
     setActiveProjectId(project.id);
     setProblem(project.problem);
-    setAnalysis(null);
+    setAnalysis(project.analysis);
+    setError(project.error || null);
     closeMenu();
   }
 
@@ -64,14 +105,20 @@ export default function Dashboard() {
     activeRequest.current = controller;
     setError(null);
     setAnalysis(null);
+    setActiveProjectId(null);
     setRunning(true);
     setActiveView("dashboard");
     try {
       const response = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ problem: brief }), signal: controller.signal });
       const result = await response.json();
       if (activeRequest.current !== controller) return;
-      setAnalysis({ outputs: result.outputs || {}, report: result.report || null, provider: result.provider, model: result.model });
-      if (!response.ok) setError(result.error || { message: "Analysis failed. Please retry." });
+      const savedAnalysis = { outputs: result.outputs || {}, report: result.report || null, provider: result.provider, model: result.model };
+      const savedError = response.ok ? null : result.error || { message: "Analysis failed. Please retry." };
+      setAnalysis(savedAnalysis);
+      setError(savedError);
+      if (response.ok || Object.keys(savedAnalysis.outputs).length > 0 || savedAnalysis.report) {
+        saveSearch(brief, savedAnalysis, savedError);
+      }
     } catch (failure) {
       if (activeRequest.current === controller && failure.name !== "AbortError") setError({ message: "Could not reach the analysis service. Check your connection and retry." });
     } finally {
@@ -84,6 +131,7 @@ export default function Dashboard() {
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,rgba(139,92,246,0.16),transparent_55%)]" />
       <div className="relative flex min-h-screen">
         <Sidebar
+          recentSearches={recentSearches}
           activeView={activeView}
           activeProjectId={activeProjectId}
           onNavigate={handleNavigate}
@@ -151,6 +199,7 @@ export default function Dashboard() {
                 </button>
               </div>
               {analysis?.provider && <p className="mt-3 text-xs text-zinc-400">Provider: {analysis.provider === "groq" ? "Groq" : "Gemini"} · Model: {analysis.model}</p>}
+              {storageError && <p role="status" className="mt-3 text-xs text-amber-300">{storageError}</p>}
               {error && (
                 <div role="alert" className="mt-4 space-y-2 text-sm text-red-300">
                   <p>{error.stage ? `${error.stage[0].toUpperCase()}${error.stage.slice(1)} could not finish: ` : ""}{error.message}</p>
