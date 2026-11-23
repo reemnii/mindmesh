@@ -70,7 +70,7 @@ export default function Dashboard() {
       const response = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ problem: brief }), signal: controller.signal });
       const result = await response.json();
       if (activeRequest.current !== controller) return;
-      setAnalysis({ outputs: result.outputs || {}, report: result.report || null });
+      setAnalysis({ outputs: result.outputs || {}, report: result.report || null, provider: result.provider, model: result.model });
       if (!response.ok) setError(result.error || { message: "Analysis failed. Please retry." });
     } catch (failure) {
       if (activeRequest.current === controller && failure.name !== "AbortError") setError({ message: "Could not reach the analysis service. Check your connection and retry." });
@@ -138,7 +138,7 @@ export default function Dashboard() {
                 <p className="px-1 text-xs text-zinc-500">
                   {running
                     ? "Running Research, Strategy, Creative, Critic, then synthesis. This may take a few minutes."
-                    : "Your problem is sent to Gemini for analysis. Up to 10,000 characters."}
+                    : "Your problem is sent to the configured AI provider. Up to 10,000 characters."}
                 </p>
                 <button
                   type="button"
@@ -150,7 +150,16 @@ export default function Dashboard() {
                   {running ? "Analyzing…" : "Analyze with MindMesh"}
                 </button>
               </div>
-              {error && <p role="alert" className="mt-4 text-sm text-red-300">{error.stage ? `${error.stage[0].toUpperCase()}${error.stage.slice(1)} failed: ` : ""}{error.message} {error.stage && "Subsequent stages were not run."}</p>}
+              {analysis?.provider && <p className="mt-3 text-xs text-zinc-400">Provider: {analysis.provider === "groq" ? "Groq" : "Gemini"} · Model: {analysis.model}</p>}
+              {error && (
+                <div role="alert" className="mt-4 space-y-2 text-sm text-red-300">
+                  <p>{error.stage ? `${error.stage[0].toUpperCase()}${error.stage.slice(1)} could not finish: ` : ""}{error.message}</p>
+                  {error.providerMessage && <p className="break-words text-xs text-zinc-400">{analysis?.provider === "groq" ? "Groq" : "Provider"}{error.providerHttpStatus ? ` HTTP ${error.providerHttpStatus}` : ""}{error.providerCode ? ` (${error.providerCode})` : ""}: {error.providerMessage}</p>}
+                  {error.retryAfterSeconds && <p>Please wait at least {error.retryAfterSeconds} {error.retryAfterSeconds === 1 ? "second" : "seconds"} before retrying.</p>}
+                  {Object.keys(analysis?.outputs || {}).length > 0 && <p>Completed agent outputs are still available below.</p>}
+                  {error.stage && error.stage !== "report" && <p>Later stages were not run.</p>}
+                </div>
+              )}
             </section>
 
             <section className="mt-8">

@@ -17,6 +17,7 @@ export async function POST(request) {
     return Response.json(await analyze(body.problem.trim(), request.signal), { headers });
   } catch (error) {
     const known = error instanceof AnalysisError;
-    return Response.json({ outputs: known ? error.outputs || {} : {}, report: null, error: { message: known ? error.message : "Analysis failed. Please retry.", code: known ? error.code : "INTERNAL_ERROR", stage: known ? error.stage : null } }, { status: known ? error.status : 500, headers: { ...headers, ...(error.status === 429 ? { "Retry-After": "30" } : {}) } });
+    const retryAfterSeconds = known ? error.retryAfterSeconds : null;
+    return Response.json({ provider: known ? error.provider || null : null, model: known ? error.model || null : null, outputs: known ? error.outputs || {} : {}, report: null, error: { message: known ? error.message : "Analysis failed. Please retry.", code: known ? error.code : "INTERNAL_ERROR", stage: known ? error.stage : null, retryAfterSeconds: retryAfterSeconds || null, providerMessage: known ? error.providerMessage || null : null, providerHttpStatus: known ? error.providerHttpStatus || null : null, providerCode: known ? error.providerCode || null : null } }, { status: known ? error.status : 500, headers: { ...headers, ...(retryAfterSeconds ? { "Retry-After": String(retryAfterSeconds) } : {}) } });
   }
 }
